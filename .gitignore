@@ -25,9 +25,8 @@ checkpoints/
 *.pt
 *.safetensors
 
-# Datos
-data/
-*.jsonl
+# Datasets under data/ are versioned on purpose; only runtime outputs are ignored
+# (see "Archivos de ejecución" below).
 *.csv
 
 # Logs y outputs

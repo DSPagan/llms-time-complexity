@@ -12,47 +12,59 @@ def train_model(
 
     Args:
         train_data_path (str): Path to the training .jsonl file.
+        model: The base model to fine-tune.
+        tokenizer: The tokenizer corresponding to the model.
         output_dir (str): Directory where the fine-tuned model will be saved.
         num_epochs (int): Number of training epochs.
         lora_r (int): Rank of the LoRA adaptation layers.
         max_seq_length (int): Maximum input sequence length.
 
     Returns:
-        transformers.TrainingStats: Training statistics and metrics.
+        The training statistics returned by the trainer.
     """
-    
+
     from unsloth import FastLanguageModel, is_bfloat16_supported
     from unsloth.chat_templates import train_on_responses_only
-    from trl import SFTTrainer
-    from transformers import TrainingArguments, DataCollatorForSeq2Seq
+    from trl import SFTTrainer, SFTConfig
     from datasets import Dataset
     import json
 
-    # Extract the data from the test_data file
-    with open(train_data_path, 'r') as f:
+    # Load the training data
+    with open(train_data_path, "r") as f:
         train_data = [json.loads(line.strip()) for line in f]
 
+    def build_prompt(src):
+        return (
+            "Analyze the time complexity of the following code.\n"
+            "Choose exactly one of the following options: O(1), O(logn), O(n), "
+            "O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).\n"
+            "Give the time complexity of the code:\n"
+            f"{src}"
+        )
+
+    # Build a chat dataset: one user turn (the prompt) + one assistant turn (the label)
+    rows = [
+        {"conversations": [
+            {"role": "user", "content": build_prompt(item["src"])},
+            {"role": "assistant", "content": item["complexity"]},
+        ]}
+        for item in train_data
+    ]
+
     def formatting_prompts_func(examples):
-        convos = examples["conversations"]
-        texts = [tokenizer.apply_chat_template([convo], tokenize = False, add_generation_prompt = False) for convo in convos]
-        texts[1] = texts[1][len("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nCutting Knowledge Date: December 2023\nToday Date: 26 July 2024\n\n<|eot_id|>"):]
-        return texts[0]+texts[1]
+        texts = [
+            tokenizer.apply_chat_template(convo, tokenize=False, add_generation_prompt=False)
+            for convo in examples["conversations"]
+        ]
+        return {"text": texts}
 
-    def gen():
-        for code in train_data:
-            prompt = f"""Analyze the time complexity of the following code.
-        Choose exactly one of the following options: O(1), O(logn), O(n), O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).
-        Give the time complexity of the code:
-        {code['src']}"""
-            yield {"conversations": [{"role": "user", "content": prompt}, {"role": "assistant", "content": code['complexity']}],
-                "text": formatting_prompts_func({"conversations": [{"role": "user", "content": prompt}, {"role": "assistant", "content": code['complexity']}]})}
-
-    dataset = Dataset.from_list(list(gen()))
+    dataset = Dataset.from_list(rows).map(formatting_prompts_func, batched=True)
 
     model = FastLanguageModel.get_peft_model(
         model,
         r = lora_r,
-        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
+                          "gate_proj", "up_proj", "down_proj"],
         lora_alpha = 16,
         lora_dropout = 0,
         bias = "none",
@@ -66,12 +78,9 @@ def train_model(
         model = model,
         tokenizer = tokenizer,
         train_dataset = dataset,
-        dataset_text_field = "text",
-        max_seq_length = max_seq_length,
-        data_collator = DataCollatorForSeq2Seq(tokenizer = tokenizer),
-        dataset_num_proc = 2,
-        packing = False,
-        args = TrainingArguments(
+        args = SFTConfig(
+            dataset_text_field = "text",
+            max_seq_length = max_seq_length,
             per_device_train_batch_size = 2,
             gradient_accumulation_steps = 4,
             warmup_steps = 5,
@@ -89,6 +98,7 @@ def train_model(
         ),
     )
 
+    # Train only on the assistant's response tokens
     trainer = train_on_responses_only(
         trainer,
         instruction_part = "<|start_header_id|>user<|end_header_id|>\n\n",

@@ -1,5 +1,5 @@
 def load_model(
-    model_path: str = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
+    model_path: str = "unsloth/Meta-Llama-3.1-8B-Instruct",
     max_seq_length: int = 2048
 ):
     """
@@ -20,7 +20,7 @@ def load_model(
     # Load the model and tokenizer
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name = model_path,
-        max_seq_length = max_seq_length, # maximum sequence length for the modelç
+        max_seq_length = max_seq_length, # maximum sequence length for the model
         load_in_4bit = True, # use 4-bit quantization for memory efficiency
         dtype = None,
     )

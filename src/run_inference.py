@@ -29,10 +29,13 @@ def run_inference(
     
 
     def build_prompt(code):
-        return f"""Analyze the time complexity of the following code.
-        Choose exactly one of the following options: O(1), O(logn), O(n), O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).
-        Give the time complexity of the code:
-        {code}"""
+        return (
+            "Analyze the time complexity of the following code.\n"
+            "Choose exactly one of the following options: O(1), O(logn), O(n), "
+            "O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).\n"
+            "Give the time complexity of the code:\n"
+            f"{code}"
+        )
 
 
     def gen_pred(prompt):
@@ -56,9 +59,8 @@ def run_inference(
                                 use_cache=True, # use cache for faster generation
                                 no_repeat_ngram_size=4) # to avoid repetition
 
-        result = tokenizer.decode(tokens[0],skip_special_tokens=True)
-        idx = result.find("assistant")
-        result = result[idx + len("assistant"):].lstrip() # Filter the output to get the assistant's response
+        result = tokenizer.decode(tokens[0], skip_special_tokens=True)
+        result = result.split("assistant")[-1].strip()  # keep only the assistant's response
 
         return result
         

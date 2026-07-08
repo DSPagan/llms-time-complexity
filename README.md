@@ -1,79 +1,140 @@
 # Estimating Time Complexity with Large Language Models
 
-This repository contains the code, experiments, and documentation for my undergraduate thesis titled:
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSPagan/llms-time-complexity/blob/main/notebooks/llm_complexity_estimation.ipynb)
+[![License: MIT](https://img.shields.io/badge/Code%20License-MIT-blue.svg)](LICENSE)
 
-**"Estimating Time Complexity with Large Language Models"**
+Undergraduate thesis (TFG) — **Bachelor's Degree in Mathematics, University of Alicante (2024–2025)**.
+
+This repository contains the code, dataset, experiments, and thesis for a study on whether large language models (LLMs) can estimate the **time complexity of algorithms without executing them**.
+
+> 🌐 **Language note:** the code and this README are written in English for wider reach. The full thesis — [`thesis/tfg-complexity.pdf`](thesis/tfg-complexity.pdf) — is written in **Spanish**, as it was the language of the degree. An English abstract is included below so the work is fully understandable without reading the Spanish document.
 
 ## 🧠 Overview
 
-The goal of this project is to investigate the potential of large language models (LLMs) to estimate the time complexity of algorithms **without executing them**. Traditionally, this estimation requires either empirical testing with inputs of varying size or manual step-counting. Here, we explore a novel approach based on deep learning and natural language processing.
+Estimating the time complexity of a program traditionally requires either empirical testing with inputs of varying size or manual step-counting. This project explores a different route: using an LLM to infer the worst-case time complexity directly from source code, framed as a 7-class classification problem over `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n²)`, `O(n³)`, and exponential.
 
-This research aims to support software developers in writing more efficient code by enabling LLMs to infer time or space complexity directly from algorithm descriptions or source code.
+Three approaches are compared on the same model — **Llama 3.1 8B Instruct**, quantized to 4 bits — to measure how much task-specific adaptation helps:
 
-## 📂 Structure
+- **Zero-shot** — the model is asked directly, with prompt engineering.
+- **Few-shot** — worked examples are added to the prompt (in-context learning).
+- **Fine-tuning** — the model is fine-tuned on labelled examples using **QLoRA**.
 
-```bash
+## 📄 Abstract
+
+> This work explores the use of large language models (LLMs) to automatically estimate the computational complexity of algorithms without executing them or performing manual analysis. It includes a theoretical review of the Transformer architecture and key concepts such as fine-tuning, quantization, and in-context learning. The performance of the `Llama 3.1 8B Instruct` model, quantized to 4 bits, is evaluated using three approaches — *zero-shot*, *few-shot*, and fine-tuning with QLoRA — based on the `CodeComplex` dataset. Results show that LLMs can provide reasonable complexity estimates even without specific training, but reach optimal performance after fine-tuning (up to **91.2% accuracy**). This study highlights the potential of LLMs as support tools for algorithmic analysis, while also acknowledging limitations related to code ambiguity, generalization, and computational resource constraints.
+
+## 📊 Results
+
+The three approaches were evaluated on a held-out test set with **accuracy** and **macro F1-score**. Fine-tuning is by far the largest driver of performance:
+
+| Approach                | Best configuration    | Accuracy   | Macro F1   |
+| ----------------------- | --------------------- | ---------- | ---------- |
+| Zero-shot               | prompt 2              | 45.0%      | 46.8       |
+| Few-shot                | in-context examples   | 49.7%      | 51.8       |
+| **Fine-tuned (QLoRA)**  | **2 epochs**          | **91.2%**  | **91.8**   |
+
+In-context examples give a modest lift over zero-shot, but fine-tuning roughly **doubles accuracy**. The fine-tuning gain is progressive with training: 66.2% (60 steps) → 90.1% (1 epoch) → 91.2% (2 epochs).
+
+The confusion matrices below show the effect clearly — predictions move from scattered (zero-shot) to a strong diagonal (fine-tuned):
+
+| Zero-shot (45.0%) | Fine-tuned with QLoRA, 2 epochs (91.2%) |
+| :---: | :---: |
+| ![Zero-shot confusion matrix](figures/CM_zeroshot_v2.png) | ![Fine-tuned confusion matrix](figures/CM_QLoRA_v3.png) |
+
+After fine-tuning, the most frequent remaining errors are confusions between adjacent complexity classes (e.g. `O(1)` vs `O(log n)`, `O(n log n)` vs `O(n)`).
+
+## 🗂️ Dataset
+
+Experiments use the **[CodeComplex](https://doi.org/10.48550/arXiv.2401.08719)** dataset (Baik et al., 2024): 4,769 Python snippets labelled with their worst-case time complexity across 7 classes.
+
+| Class | `O(1)` | `O(log n)` | `O(n)` | `O(n log n)` | `O(n²)` | `O(n³)` | exponential |
+| ----- | ------ | ---------- | ------ | ------------ | ------- | ------- | ----------- |
+| Count | 770    | 652        | 837    | 783          | 645     | 579     | 503         |
+
+The split used here is provided in [`data/`](data/) (`train_data.jsonl` / `test_data.jsonl`). The dataset is redistributed for reproducibility and remains subject to its original license — see [License](#-license).
+
+## 📂 Repository structure
+
+```text
 .
-├── data/                # Raw and processed datasets for training and evaluation
-├── figures/             # Figures used in the thesis
-├── notebooks/           # Jupyter notebooks for training and experimentation
-├── outputs/             # Output files such as fine-tuned models and inference results
-├── src/                 # Source code (Python scripts and utilities)
-├── thesis/              # LaTeX source and compiled PDF of the thesis
-├── .gitignore           # Git ignore rules for excluding unnecessary files from version control
-└── README.md            # Project overview and instructions
+├── data/          # CodeComplex split (train/test .jsonl) used for the experiments
+├── figures/       # Confusion matrices and prompts used in the thesis
+├── notebooks/     # End-to-end Colab notebook (data → fine-tuning → inference)
+├── src/           # Reusable functions: load_model, train_model, run_inference
+├── thesis/        # LaTeX source and compiled PDF of the thesis (Spanish)
+├── outputs/       # Fine-tuned adapters and inference results (generated at runtime, not tracked)
+├── requirements.txt       # How to install the stack
+├── requirements-lock.txt  # Exact versions verified to work
+├── LICENSE
+└── README.md
 ```
 
-### 🛠️ Installation
+## 🛠️ Installation
 
-To run the fine-tuning and inference scripts, install the following dependencies:
+Requires **Python 3.10–3.12** and a **CUDA-enabled GPU**. Unsloth pulls its own compatible stack, so the install is a one-liner (on Google Colab a CUDA-enabled PyTorch is already present):
 
 ```bash
-pip install --no-deps bitsandbytes accelerate xformers==0.0.29.post3 peft trl triton cut_cross_entropy unsloth_zoo
-pip install sentencepiece protobuf "datasets>=3.4.1" huggingface_hub hf_transfer
-pip install --no-deps unsloth
+pip install --upgrade unsloth unsloth_zoo
 ```
 
-Make sure you're using Python ≥3.10 and a GPU-enabled environment with CUDA support. These dependencies are optimized for 4-bit quantized models and efficient training with LoRA.
+The easiest path is to run the notebook in Colab (badge at the top), where CUDA and PyTorch come preinstalled.
 
-## 📊 Methodology
+> **Reproducibility:** [`requirements-lock.txt`](requirements-lock.txt) pins the exact versions verified to work end-to-end on Colab (July 2026). Because Unsloth and its stack move quickly, that lock is the most reliable way to reproduce the environment.
 
-1. **Dataset Preparation**: Collection of algorithms annotated with their time complexity.
-2. **Prompt Engineering**: Designing prompts to elicit accurate predictions from LLMs.
-3. **Fine-Tuning**: Training LLMs on algorithm-complexity pairs using QLoRA.
-4. **Evaluation**: Testing generalization on unseen algorithms and measuring prediction accuracy.
+## 🚀 Usage
 
-## 📈 Goals
+The quickest way to reproduce the full pipeline is the notebook — open it directly in Colab with the badge above, or run [`notebooks/llm_complexity_estimation.ipynb`](notebooks/llm_complexity_estimation.ipynb) end to end (data download → fine-tuning → inference).
 
-- Investigate in-context learning capabilities for reasoning about code.
-- Evaluate whether LLMs can estimate complexity without execution.
-- Compare zero-shot, few-shot, and fine-tuned performance.
+To use the pieces programmatically, the functions in [`src/`](src/) can be composed:
 
-## 📚 References
+```python
+from src.load_model import load_model
+from src.train_model import train_model
+from src.run_inference import run_inference
 
-- Albert, J. V., Rabasa, F. J. F., & Quetglás, G. M. (1998). *Introducció a l’anàlisi i disseny d’algorismes*. Universitat de València.
-- Ba, J. L., Kiros, J. R., & Hinton, G. E. (2016). [Layer normalization](https://arxiv.org/abs/1607.06450). *arXiv preprint arXiv:1607.06450*.
-- Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P., ... & Amodei, D. (2020). [Language models are few-shot learners](https://arxiv.org/abs/2005.14165). *Advances in Neural Information Processing Systems, 33*, 1877–1901.
-- Hochreiter, S., & Schmidhuber, J. (1997). [Long short-term memory](https://doi.org/10.1162/neco.1997.9.8.1735). *Neural Computation, 9*(8), 1735–1780.
-- Howard, J., & Ruder, S. (2018). [Universal language model fine-tuning for text classification](https://doi.org/10.18653/v1/P18-1031). In *Proceedings of ACL 2018* (pp. 328–339).
-- Jurafsky, D., & Martin, J. H. (2025). *Speech and language processing* (3rd ed.). Manuscript in preparation. [Link](https://web.stanford.edu/~jurafsky/slp3)
-- Kingma, D. P., & Ba, J. (2014). [Adam: A method for stochastic optimization](https://arxiv.org/abs/1412.6980). *arXiv preprint arXiv:1412.6980*.
-- Lin, C.-Y. (2004). [ROUGE: A package for automatic evaluation of summaries](https://aclanthology.org/W04-1013/). In *Proceedings of the Workshop on Text Summarization Branches Out* (pp. 74–81).
-- Loshchilov, I., & Hutter, F. (2019). [Decoupled weight decay regularization](https://arxiv.org/abs/1711.05101). *arXiv preprint arXiv:1711.05101*.
-- Papineni, K., Roukos, S., Ward, T., & Zhu, W.-J. (2002). [BLEU: A method for automatic evaluation of machine translation](https://doi.org/10.3115/1073083.1073135). In *Proceedings of ACL 2002* (pp. 311–318).
-- Rajpurkar, P., Zhang, J., Lopyrev, K., & Liang, P. (2016). [SQuAD: 100,000+ questions for machine comprehension of text](https://aclanthology.org/D16-1264/). In *Proceedings of EMNLP 2016* (pp. 2383–2392).
-- Rumelhart, D. E., Hinton, G. E., & Williams, R. J. (1986). [Learning representations by back-propagating errors](https://doi.org/10.1038/323533a0). *Nature, 323*(6088), 533–536.
-- Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., ... & Polosukhin, I. (2017). [Attention is all you need](https://papers.nips.cc/paper_files/paper/2017/file/3f5ee243547dee91fbd053c1c4a845aa-Paper.pdf). In *Advances in Neural Information Processing Systems* (Vol. 30).
+model, tokenizer = load_model()  # Llama 3.1 8B Instruct, 4-bit
 
+# Fine-tune with QLoRA on the training split
+train_model("data/train_data.jsonl", model, tokenizer, num_epochs=2)
+
+# Estimate the complexity of a snippet
+prediction = run_inference("def f(n):\n    return sum(range(n))", model, tokenizer)
+print(prediction)
+```
+
+## 🔬 Methodology
+
+1. **Dataset** — CodeComplex snippets annotated with time complexity.
+2. **Prompt engineering** — designing prompts that elicit accurate zero-shot predictions.
+3. **In-context learning** — adding worked examples (few-shot).
+4. **Fine-tuning** — training with QLoRA on algorithm–complexity pairs.
+5. **Evaluation** — accuracy and macro F1 on a held-out test set, plus confusion-matrix analysis.
+
+## 📚 Thesis
+
+The full memoria (in Spanish) is available at [`thesis/tfg-complexity.pdf`](thesis/tfg-complexity.pdf), with LaTeX source in the same folder. It covers the theoretical background (Transformers, fine-tuning, quantization, in-context learning) and a detailed analysis of every experiment summarized above.
+
+<details>
+<summary>Key references</summary>
+
+- Baik, S.-Y., Hahn, J., Kim, J., Jeon, M., Han, Y.-S., & Ko, S.-K. (2024). [CodeComplex: Dataset for worst-case time complexity prediction](https://doi.org/10.48550/arXiv.2401.08719). *arXiv:2401.08719*.
+- Touvron, H., et al. (2024). [The Llama 3 herd of models](https://arxiv.org/abs/2407.21783). *arXiv:2407.21783*.
+- Vaswani, A., et al. (2017). [Attention is all you need](https://papers.nips.cc/paper_files/paper/2017/file/3f5ee243547dee91fbd053c1c4a845aa-Paper.pdf). *NeurIPS 30*.
+- Brown, T. B., et al. (2020). [Language models are few-shot learners](https://arxiv.org/abs/2005.14165). *NeurIPS 33*, 1877–1901.
+- Hu, E. J., et al. (2021). [LoRA: Low-rank adaptation of large language models](https://arxiv.org/abs/2106.09685). *arXiv:2106.09685*.
+
+The complete bibliography is in the thesis.
+
+</details>
 
 ## 🧑‍💻 Author
 
-**Daniel Sánchez Pagán**  
-Bachelor's Degree in Mathematics  
-University of Alicante  
-Academic Year: 2024–2025
+**Daniel Sánchez Pagán**
+Bachelor's Degree in Mathematics — University of Alicante
+Academic Year 2024–2025
 
 ## 📄 License
 
-This project is for academic and research purposes only.  
-License details will be added later.
+- **Code** (`src/`, `notebooks/`) — [MIT](LICENSE).
+- **Thesis** (`thesis/`) — © 2025 Daniel Sánchez Pagán, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Dataset** (`data/`) — derived from [CodeComplex](https://doi.org/10.48550/arXiv.2401.08719); subject to the terms of the original dataset.
