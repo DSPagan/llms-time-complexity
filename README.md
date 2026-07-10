@@ -59,7 +59,7 @@ The pipeline starts from the original CodeComplex snapshot ([`data/data.jsonl`](
 ├── data/          # the original CodeComplex snapshot (data.jsonl)
 ├── figures/       # Confusion matrices from the experiments
 ├── notebooks/     # fine_tuning.ipynb and in_context_learning.ipynb (Colab)
-├── src/           # prepare_data, load_model, prompts, train_model, run_inference, evaluate
+├── src/           # prepare_data, load_model, prompts, train_model, evaluate
 ├── thesis/        # LaTeX source and compiled PDF of the thesis (Spanish)
 ├── outputs/       # Fine-tuned adapters and inference results (generated at runtime, not tracked)
 ├── requirements.txt       # How to install the stack
@@ -91,19 +91,13 @@ To use the pieces programmatically, the modules in [`src/`](src/) compose:
 
 ```python
 from src.load_model import load_model
-from src.train_model import train_model
-from src.prepare_data import load_clean, stratified_folds, write_jsonl
-from src.run_inference import run_inference
+from src.prepare_data import load_clean, stratified_folds
 
-model, tokenizer = load_model()                     # Llama 3.1 8B Instruct, 4-bit
+model, tokenizer = load_model()          # Llama 3.1 8B Instruct, 4-bit
+folds = stratified_folds(load_clean())   # 5 stratified CV folds
 
-# Fine-tune on four of the five CV folds (train_model returns the fine-tuned model)
-folds = stratified_folds(load_clean())
-write_jsonl([x for f in folds[1:] for x in f], "train.jsonl")
-model, _ = train_model("train.jsonl", model, tokenizer, num_epochs=2)
-
-# Estimate the complexity of a snippet
-print(run_inference("def f(n):\n    return sum(range(n))", model, tokenizer))
+# The notebooks compose these with src.train_model and src.evaluate
+# into the full zero-/few-shot/CoT and QLoRA cross-validation loops.
 ```
 
 ## 🔬 Methodology
