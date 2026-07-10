@@ -1,3 +1,6 @@
+from .prompts import build_prompt
+
+
 def run_inference(
     input_data: str,
     model,
@@ -26,17 +29,6 @@ def run_inference(
 
     import json
     from pathlib import Path
-    
-
-    def build_prompt(code):
-        return (
-            "Analyze the time complexity of the following code.\n"
-            "Choose exactly one of the following options: O(1), O(logn), O(n), "
-            "O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).\n"
-            "Give the time complexity of the code:\n"
-            f"{code}"
-        )
-
 
     def gen_pred(prompt):
         messages = [

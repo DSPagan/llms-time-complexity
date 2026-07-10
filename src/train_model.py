@@ -1,3 +1,6 @@
+from .prompts import build_prompt
+
+
 def train_model(
     train_data_path: str,
     model,
@@ -20,7 +23,9 @@ def train_model(
         max_seq_length (int): Maximum input sequence length.
 
     Returns:
-        The training statistics returned by the trainer.
+        (model, trainer_stats): the fine-tuned model and the training statistics.
+        The model is returned because QLoRA wraps it here, so the caller must use
+        this object (not the original) for inference.
     """
 
     from unsloth import FastLanguageModel, is_bfloat16_supported
@@ -32,15 +37,6 @@ def train_model(
     # Load the training data
     with open(train_data_path, "r") as f:
         train_data = [json.loads(line.strip()) for line in f]
-
-    def build_prompt(src):
-        return (
-            "Analyze the time complexity of the following code.\n"
-            "Choose exactly one of the following options: O(1), O(logn), O(n), "
-            "O(nlogn), O(n^2), O(n^3) or exponential (O(2^n), O(3^n), etc.).\n"
-            "Give the time complexity of the code:\n"
-            f"{src}"
-        )
 
     # Build a chat dataset: one user turn (the prompt) + one assistant turn (the label)
     rows = [
@@ -106,4 +102,4 @@ def train_model(
     )
 
     trainer_stats = trainer.train()
-    return trainer_stats
+    return model, trainer_stats
