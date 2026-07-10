@@ -74,6 +74,30 @@ def stratified_split(records, field="complexity", test_size=0.1, seed=42,
     return train, test
 
 
+def load_clean(data_path="data/data.jsonl"):
+    """Load the raw dataset, de-duplicated and with labels normalized."""
+    records = read_jsonl(data_path)
+    records = deduplicate(records, field="src")
+    return normalize_labels(records)
+
+
+def stratified_folds(records, field="complexity", k=5, seed=42):
+    """Split records into k folds with balanced class proportions (for cross-validation)."""
+    groups = defaultdict(list)
+    for obj in records:
+        groups[obj.get(field)].append(obj)
+    rng = random.Random(seed)
+    folds = [[] for _ in range(k)]
+    for label, items in sorted(groups.items()):
+        items = list(items)
+        rng.shuffle(items)
+        for i, obj in enumerate(items):
+            folds[i % k].append(obj)
+    for f in folds:
+        rng.shuffle(f)
+    return folds
+
+
 def prepare(
     data_path="data/data.jsonl",
     train_path="data/train_data.jsonl",

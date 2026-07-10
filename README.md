@@ -26,7 +26,7 @@ Three approaches are compared on the same model — **Llama 3.1 8B Instruct**, q
 
 ## 📊 Results
 
-> ⏳ **Being refreshed.** The numbers and figures below are the results reported in the thesis. The data pipeline has since been made fully reproducible (the split is regenerated from the original CodeComplex snapshot) and a chain-of-thought prompt was added, so these will be re-measured on the current setup.
+> ⏳ **Being refreshed.** The numbers and figures below are the results reported in the thesis. The data pipeline has since been made fully reproducible (regenerated from the original CodeComplex snapshot), a chain-of-thought prompt was added, and every experiment now runs under **5-fold cross-validation**, so these will be re-measured (as mean ± std) on the current setup.
 
 The three approaches were evaluated on a held-out test set with **accuracy** and **macro F1-score**. Fine-tuning is by far the largest driver of performance:
 
@@ -109,7 +109,7 @@ print(run_inference("def f(n):\n    return sum(range(n))", model, tokenizer))
 2. **Prompt engineering** — designing prompts that elicit accurate zero-shot predictions.
 3. **In-context learning** — adding worked examples (few-shot).
 4. **Fine-tuning** — training with QLoRA on algorithm–complexity pairs.
-5. **Evaluation** — accuracy and macro F1 on a held-out test set, plus confusion-matrix analysis.
+5. **Evaluation** — accuracy and macro F1 under **5-fold cross-validation** (reported as mean ± std), plus confusion-matrix analysis.
 
 ## 📚 Thesis
 
