@@ -1,6 +1,6 @@
 # Estimating Time Complexity with Large Language Models
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSPagan/llms-time-complexity/blob/main/notebooks/llm_complexity_estimation.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DSPagan/llms-time-complexity/blob/main/notebooks/fine_tuning.ipynb)
 [![License: MIT](https://img.shields.io/badge/Code%20License-MIT-blue.svg)](LICENSE)
 
 Undergraduate thesis (TFG) — **Bachelor's Degree in Mathematics, University of Alicante (2024–2025)**.
@@ -18,12 +18,15 @@ Three approaches are compared on the same model — **Llama 3.1 8B Instruct**, q
 - **Zero-shot** — the model is asked directly, with prompt engineering.
 - **Few-shot** — worked examples are added to the prompt (in-context learning).
 - **Fine-tuning** — the model is fine-tuned on labelled examples using **QLoRA**.
+- **Chain-of-thought** *(beyond the thesis)* — the model reasons step by step before answering.
 
 ## 📄 Abstract
 
 > This work explores the use of large language models (LLMs) to automatically estimate the computational complexity of algorithms without executing them or performing manual analysis. It includes a theoretical review of the Transformer architecture and key concepts such as fine-tuning, quantization, and in-context learning. The performance of the `Llama 3.1 8B Instruct` model, quantized to 4 bits, is evaluated using three approaches — *zero-shot*, *few-shot*, and fine-tuning with QLoRA — based on the `CodeComplex` dataset. Results show that LLMs can provide reasonable complexity estimates even without specific training, but reach optimal performance after fine-tuning (up to **91.2% accuracy**). This study highlights the potential of LLMs as support tools for algorithmic analysis, while also acknowledging limitations related to code ambiguity, generalization, and computational resource constraints.
 
 ## 📊 Results
+
+> ⏳ **Being refreshed.** The numbers and figures below are the results reported in the thesis. The data pipeline has since been made fully reproducible (the split is regenerated from the original CodeComplex snapshot) and a chain-of-thought prompt was added, so these will be re-measured on the current setup.
 
 The three approaches were evaluated on a held-out test set with **accuracy** and **macro F1-score**. Fine-tuning is by far the largest driver of performance:
 
@@ -45,22 +48,18 @@ After fine-tuning, the most frequent remaining errors are confusions between adj
 
 ## 🗂️ Dataset
 
-Experiments use the **[CodeComplex](https://doi.org/10.48550/arXiv.2401.08719)** dataset (Baik et al., 2024): 4,769 Python snippets labelled with their worst-case time complexity across 7 classes.
+Experiments use the **[CodeComplex](https://doi.org/10.48550/arXiv.2401.08719)** dataset (Baik et al., 2024): Python snippets labelled with their worst-case time complexity across 7 classes (`O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n²)`, `O(n³)`, exponential).
 
-| Class | `O(1)` | `O(log n)` | `O(n)` | `O(n log n)` | `O(n²)` | `O(n³)` | exponential |
-| ----- | ------ | ---------- | ------ | ------------ | ------- | ------- | ----------- |
-| Count | 770    | 652        | 837    | 783          | 645     | 579     | 503         |
-
-The split used here is provided in [`data/`](data/) (`train_data.jsonl` / `test_data.jsonl`). The dataset is redistributed for reproducibility and remains subject to its original license — see [License](#-license).
+The pipeline starts from the original CodeComplex snapshot ([`data/data.jsonl`](data/data.jsonl)) and is fully reproducible: [`src/prepare_data.py`](src/prepare_data.py) de-duplicates by source code and builds a stratified 90/10 train/test split (`python src/prepare_data.py`). The dataset is redistributed for reproducibility and remains subject to its original license — see [License](#-license).
 
 ## 📂 Repository structure
 
 ```text
 .
-├── data/          # CodeComplex split (train/test .jsonl) used for the experiments
-├── figures/       # Confusion matrices and prompts used in the thesis
-├── notebooks/     # End-to-end Colab notebook (data → fine-tuning → inference)
-├── src/           # Reusable functions: load_model, train_model, run_inference
+├── data/          # CodeComplex (data.jsonl) + the regenerated train/test split
+├── figures/       # Confusion matrices and the prompts used in the experiments
+├── notebooks/     # fine_tuning.ipynb and in_context_learning.ipynb (Colab)
+├── src/           # prepare_data, load_model, prompts, train_model, run_inference, evaluate
 ├── thesis/        # LaTeX source and compiled PDF of the thesis (Spanish)
 ├── outputs/       # Fine-tuned adapters and inference results (generated at runtime, not tracked)
 ├── requirements.txt       # How to install the stack
@@ -83,23 +82,25 @@ The easiest path is to run the notebook in Colab (badge at the top), where CUDA 
 
 ## 🚀 Usage
 
-The quickest way to reproduce the full pipeline is the notebook — open it directly in Colab with the badge above, or run [`notebooks/llm_complexity_estimation.ipynb`](notebooks/llm_complexity_estimation.ipynb) end to end (data download → fine-tuning → inference).
+Two Colab notebooks reproduce the experiments end to end (each clones the repo, regenerates the split, and runs on a GPU):
 
-To use the pieces programmatically, the functions in [`src/`](src/) can be composed:
+- [`notebooks/in_context_learning.ipynb`](notebooks/in_context_learning.ipynb) — zero-shot (3 prompts), few-shot, and a chain-of-thought prompt on the base model.
+- [`notebooks/fine_tuning.ipynb`](notebooks/fine_tuning.ipynb) — QLoRA fine-tuning and evaluation.
+
+To use the pieces programmatically, the modules in [`src/`](src/) compose:
 
 ```python
 from src.load_model import load_model
 from src.train_model import train_model
 from src.run_inference import run_inference
 
-model, tokenizer = load_model()  # Llama 3.1 8B Instruct, 4-bit
+model, tokenizer = load_model()                 # Llama 3.1 8B Instruct, 4-bit
 
-# Fine-tune with QLoRA on the training split
-train_model("data/train_data.jsonl", model, tokenizer, num_epochs=2)
+# Fine-tune with QLoRA; train_model returns the fine-tuned model
+model, _ = train_model("data/train_data.jsonl", model, tokenizer, num_epochs=2)
 
 # Estimate the complexity of a snippet
-prediction = run_inference("def f(n):\n    return sum(range(n))", model, tokenizer)
-print(prediction)
+print(run_inference("def f(n):\n    return sum(range(n))", model, tokenizer))
 ```
 
 ## 🔬 Methodology
