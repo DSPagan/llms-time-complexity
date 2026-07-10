@@ -118,7 +118,10 @@ def plot_confusion_matrix(cm, title="Confusion matrix", save_path=None):
     fig.tight_layout()
     if save_path:
         fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    return fig
+    # Show once and close: returning the figure would make the notebook render it a
+    # second time (on top of matplotlib's inline auto-display).
+    plt.show()
+    plt.close(fig)
 
 
 def print_summary(name, results):
