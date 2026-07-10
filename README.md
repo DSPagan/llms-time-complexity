@@ -50,14 +50,14 @@ After fine-tuning, the most frequent remaining errors are confusions between adj
 
 Experiments use the **[CodeComplex](https://doi.org/10.48550/arXiv.2401.08719)** dataset (Baik et al., 2024): Python snippets labelled with their worst-case time complexity across 7 classes (`O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n²)`, `O(n³)`, exponential).
 
-The pipeline starts from the original CodeComplex snapshot ([`data/data.jsonl`](data/data.jsonl)) and is fully reproducible: [`src/prepare_data.py`](src/prepare_data.py) de-duplicates by source code and builds a stratified 90/10 train/test split (`python src/prepare_data.py`). The dataset is redistributed for reproducibility and remains subject to its original license — see [License](#-license).
+The pipeline starts from the original CodeComplex snapshot ([`data/data.jsonl`](data/data.jsonl)) and is fully reproducible: [`src/prepare_data.py`](src/prepare_data.py) de-duplicates by source code and splits the data into stratified 5-fold cross-validation partitions in memory (`load_clean` + `stratified_folds`). The dataset is redistributed for reproducibility and remains subject to its original license — see [License](#-license).
 
 ## 📂 Repository structure
 
 ```text
 .
-├── data/          # CodeComplex (data.jsonl) + the regenerated train/test split
-├── figures/       # Confusion matrices and the prompts used in the experiments
+├── data/          # the original CodeComplex snapshot (data.jsonl)
+├── figures/       # Confusion matrices from the experiments
 ├── notebooks/     # fine_tuning.ipynb and in_context_learning.ipynb (Colab)
 ├── src/           # prepare_data, load_model, prompts, train_model, run_inference, evaluate
 ├── thesis/        # LaTeX source and compiled PDF of the thesis (Spanish)
@@ -82,22 +82,25 @@ The easiest path is to run the notebook in Colab (badge at the top), where CUDA 
 
 ## 🚀 Usage
 
-Two Colab notebooks reproduce the experiments end to end (each clones the repo, regenerates the split, and runs on a GPU):
+Two Colab notebooks reproduce the experiments end to end under **5-fold cross-validation** (each clones the repo, builds the folds, and runs on a GPU):
 
-- [`notebooks/in_context_learning.ipynb`](notebooks/in_context_learning.ipynb) — zero-shot (3 prompts), few-shot, and a chain-of-thought prompt on the base model.
-- [`notebooks/fine_tuning.ipynb`](notebooks/fine_tuning.ipynb) — QLoRA fine-tuning and evaluation.
+- [`notebooks/in_context_learning.ipynb`](notebooks/in_context_learning.ipynb) — zero-shot (2 prompts), few-shot, and chain-of-thought on the base model.
+- [`notebooks/fine_tuning.ipynb`](notebooks/fine_tuning.ipynb) — QLoRA fine-tuning, one fold per session.
 
 To use the pieces programmatically, the modules in [`src/`](src/) compose:
 
 ```python
 from src.load_model import load_model
 from src.train_model import train_model
+from src.prepare_data import load_clean, stratified_folds, write_jsonl
 from src.run_inference import run_inference
 
-model, tokenizer = load_model()                 # Llama 3.1 8B Instruct, 4-bit
+model, tokenizer = load_model()                     # Llama 3.1 8B Instruct, 4-bit
 
-# Fine-tune with QLoRA; train_model returns the fine-tuned model
-model, _ = train_model("data/train_data.jsonl", model, tokenizer, num_epochs=2)
+# Fine-tune on four of the five CV folds (train_model returns the fine-tuned model)
+folds = stratified_folds(load_clean())
+write_jsonl([x for f in folds[1:] for x in f], "train.jsonl")
+model, _ = train_model("train.jsonl", model, tokenizer, num_epochs=2)
 
 # Estimate the complexity of a snippet
 print(run_inference("def f(n):\n    return sum(range(n))", model, tokenizer))
