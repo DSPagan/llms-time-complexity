@@ -38,13 +38,7 @@ The three approaches were evaluated on a held-out test set with **accuracy** and
 
 In-context examples give a modest lift over zero-shot, but fine-tuning roughly **doubles accuracy**. The fine-tuning gain is progressive with training: 66.2% (60 steps) → 90.1% (1 epoch) → 91.2% (2 epochs).
 
-The confusion matrices below show the effect clearly — predictions move from scattered (zero-shot) to a strong diagonal (fine-tuned):
-
-| Zero-shot (45.0%) | Fine-tuned with QLoRA, 2 epochs (91.2%) |
-| :---: | :---: |
-| ![Zero-shot confusion matrix](figures/CM_zeroshot_v2.png) | ![Fine-tuned confusion matrix](figures/CM_QLoRA_v3.png) |
-
-After fine-tuning, the most frequent remaining errors are confusions between adjacent complexity classes (e.g. `O(1)` vs `O(log n)`, `O(n log n)` vs `O(n)`).
+Confusion matrices for the cross-validated runs are being regenerated and will replace this section together with the final numbers.
 
 ## 🗂️ Dataset
 
