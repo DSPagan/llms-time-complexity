@@ -1,7 +1,8 @@
-# Dependencies for the time-complexity LLM pipeline.
+# Direct dependencies of the time-complexity LLM pipeline (documentation only).
 #
-# Install (Google Colab or any CUDA-enabled GPU):
-#   pip install --upgrade unsloth unsloth_zoo
+# To actually install, use the pinned lock instead -- Unsloth breaks between releases,
+# and every experiment must run on the same stack for the results to be comparable:
+#   pip install -r requirements-lock.txt
 #
 # Unsloth pulls its own compatible stack (torch, transformers, trl, peft,
 # bitsandbytes, xformers, datasets, ...). On Colab a CUDA-enabled PyTorch is

@@ -70,15 +70,15 @@ The pipeline starts from the original CodeComplex snapshot ([`data/data.jsonl`](
 
 ## 🛠️ Installation
 
-Requires **Python 3.10–3.12** and a **CUDA-enabled GPU**. Unsloth pulls its own compatible stack, so the install is a one-liner (on Google Colab a CUDA-enabled PyTorch is already present):
+Requires **Python 3.10–3.12** and a **CUDA-enabled GPU** (on Google Colab a CUDA-enabled PyTorch is already present). Install the pinned stack:
 
 ```bash
-pip install --upgrade unsloth unsloth_zoo
+pip install -r requirements-lock.txt
 ```
 
-The easiest path is to run the notebook in Colab (badge at the top), where CUDA and PyTorch come preinstalled.
+The easiest path is to run the notebooks in Colab (badges above) — they clone the repo and install from this lock automatically.
 
-> **Reproducibility:** [`requirements-lock.txt`](requirements-lock.txt) pins the exact versions verified to work end-to-end on Colab (July 2026). Because Unsloth and its stack move quickly, that lock is the most reliable way to reproduce the environment.
+> **Why pinned, not latest:** Unsloth moves fast enough to break between releases (a newer version stopped resolving the 4-bit model repo mid-project). [`requirements-lock.txt`](requirements-lock.txt) pins the exact versions verified to work end to end, so **every experiment runs on the same stack** — which is what keeps the results comparable across notebooks.
 
 ## 🚀 Usage
 
